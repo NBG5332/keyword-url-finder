@@ -3,20 +3,26 @@ import requests
 import re
 from urllib3.exceptions import InsecureRequestWarning
 from html import unescape
+import traceback
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 def clean_html(html):
-    # Remove script and style elements
-    html = re.sub(r'<(script|style).*?</\1>(?s)', '', html)
-    # Remove HTML tags
-    html = re.sub(r'<[^>]+>', ' ', html)
-    # Decode HTML entities
-    html = unescape(html)
-    # Remove extra whitespace
-    html = re.sub(r'\s+', ' ', html).strip()
-    return html
+    try:
+        # Remove script and style elements
+        html = re.sub(r'<(script|style).*?</\1>(?s)', '', html)
+        # Remove HTML tags
+        html = re.sub(r'<[^>]+>', ' ', html)
+        # Decode HTML entities
+        html = unescape(html)
+        # Remove extra whitespace
+        html = re.sub(r'\s+', ' ', html).strip()
+        return html
+    except Exception as e:
+        st.error(f"Error in clean_html: {e}")
+        st.error(traceback.format_exc())
+        return ""
 
 def find_keywords(url, keywords):
     try:
@@ -29,18 +35,22 @@ def find_keywords(url, keywords):
         
         matches = {}
         for keyword in keywords:
-            keyword_lower = keyword.lower()
-            # Use word boundary for whole word matching
-            pattern = r'\b' + re.escape(keyword_lower) + r'\b'
-            count = len(re.findall(pattern, cleaned_content))
-            if count > 0:
-                matches[keyword] = count
+            try:
+                keyword_lower = keyword.lower()
+                pattern = r'\b' + re.escape(keyword_lower) + r'\b'
+                count = len(re.findall(pattern, cleaned_content))
+                if count > 0:
+                    matches[keyword] = count
+            except Exception as e:
+                st.error(f"Error processing keyword '{keyword}': {e}")
+                st.error(traceback.format_exc())
         return matches, len(html_content)
     except requests.RequestException as e:
         st.error(f"Error fetching the webpage: {e}")
         return None, 0
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
+        st.error(traceback.format_exc())
         return None, 0
 
 st.title("Keyword Finder")
@@ -50,7 +60,7 @@ keywords_input = st.text_input("Enter keywords to search for (comma-separated):"
 
 if st.button("Search"):
     if url and keywords_input:
-        keywords = [k.strip() for k in keywords_input.split(',')]
+        keywords = [k.strip() for k in keywords_input.split(',') if k.strip()]
         
         results, page_size = find_keywords(url, keywords)
         
@@ -76,5 +86,6 @@ if st.button("Search"):
             st.write(f"Page Size: {page_size} characters")
         except Exception as e:
             st.error(f"Failed to get additional information: {e}")
+            st.error(traceback.format_exc())
     else:
         st.warning("Please enter both URL and keywords.")
