@@ -11,7 +11,7 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 def clean_html(html):
     try:
         # Remove script and style elements
-        html = re.sub(r'<(script|style).*?</\1>(?s)', '', html)
+        html = re.sub(r'(?s)<(script|style).*?</\1>', '', html)
         # Remove HTML tags
         html = re.sub(r'<[^>]+>', ' ', html)
         # Decode HTML entities
