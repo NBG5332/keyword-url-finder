@@ -1,77 +1,68 @@
 import streamlit as st
-import requests
 import re
-from bs4 import BeautifulSoup
-from urllib3.exceptions import InsecureRequestWarning
+from playwright.sync_api import sync_playwright
+import os
 
-# Suppress only the single warning from urllib3 needed.
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+def setup_playwright():
+    # This will be triggered to install browser binaries on first run
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        # Install only if not already installed
+        if not os.path.exists("/mnt/data/playwright"):
+            p.chromium.install()
 
-def find_keywords(url, keywords):
+def find_keywords_playwright(url, keywords):
     try:
-        # Send a GET request to the URL
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        
-        # Get the full HTML content
-        html_content = response.text.lower()
-        
-        # Find matches for each keyword
-        matches = {}
-        for keyword in keywords:
-            keyword_lower = keyword.lower()
-            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
-            if count > 0:
-                matches[keyword] = count
-        
-        return matches
-    except requests.RequestException as e:
-        st.error(f"Error fetching the webpage: {e}")
-        return None
+        # Launch the browser
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url)
+
+            # Get the page source
+            html_content = page.content().lower()
+
+            # Find matches for each keyword
+            matches = {}
+            for keyword in keywords:
+                keyword_lower = keyword.lower()
+                count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+                if count > 0:
+                    matches[keyword] = count
+
+            browser.close()
+            return matches
     except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
+        st.error(f"An error occurred while fetching the webpage: {e}")
         return None
 
 def main():
     st.title("Keyword Finder in Web Pages")
     st.write("Enter a URL and a list of keywords to find out how often each keyword appears on the webpage.")
-    
+
+    # Button to setup Playwright browser binaries
+    if st.sidebar.button("Setup Playwright"):
+        setup_playwright()
+        st.sidebar.success("Playwright setup completed!")
+
     url = st.text_input("Enter the URL to inspect:", "")
     keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
-    
+
     if st.button("Search Keywords"):
         if url and keywords_input:
             keywords = [k.strip() for k in keywords_input.split(',')]
-            results = find_keywords(url, keywords)
-            
+            results = find_keywords_playwright(url, keywords)
+
             if results is not None:
                 if results:
                     st.success("Keywords found:")
                     for keyword, count in results.items():
                         st.write(f"'{keyword}': {count} occurrences")
-                    
+
                     not_found = set(keywords) - set(results.keys())
                     if not_found:
                         st.info("Keywords not found:")
                         for keyword in not_found:
                             st.write(f"'{keyword}'")
                 else:
-                    st.warning("No keywords were found on the page.")
-            else:
-                st.error("Unable to process the page due to an error.")
-            
-            # Additional debugging information
-            st.subheader("Additional Information:")
-            try:
-                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
-                st.write(f"Status Code: {response.status_code}")
-                st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
-                st.write(f"Page Size: {len(response.text)} characters")
-            except Exception as e:
-                st.error(f"Failed to get additional information: {e}")
-
-if __name__ == "__main__":
-    main()
+                    st.warning("No keywords
