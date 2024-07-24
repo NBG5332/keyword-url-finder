@@ -1,23 +1,47 @@
 import streamlit as st
-import subprocess
-import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib3.exceptions import InsecureRequestWarning
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-def check_keyword(url, keyword):
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+def find_keywords(url, keywords):
     try:
-        result = subprocess.run(['curl', '--silent', url], capture_output=True, text=True, timeout=30)
-        if result.returncode == 0:
-            grep_result = subprocess.run(['grep', '-i', keyword], input=result.stdout, capture_output=True, text=True)
-            return grep_result.stdout.strip() != ''
-        else:
-            st.error(f"Error fetching {url}: {result.stderr}")
-            return False
-    except subprocess.TimeoutExpired:
-        st.error(f"Timeout while fetching {url}")
-        return False
+        # Set up Selenium
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        driver = webdriver.Chrome(options=chrome_options)
+        
+        # Load the page
+        driver.get(url)
+        
+        # Wait for the page to load (adjust the timeout and condition as needed)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        
+        # Get the rendered HTML content
+        html_content = driver.page_source.lower()
+        
+        # Find matches for each keyword
+        matches = {}
+        for keyword in keywords:
+            keyword_lower = keyword.lower()
+            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            if count > 0:
+                matches[keyword] = count
+        
+        driver.quit()
+        return matches
     except Exception as e:
-        st.error(f"Unexpected error processing {url}: {e}")
-        return False
+        st.error(f"An error occurred: {e}")
+        return None
 
+# ... (rest of the Streamlit code remains the same)
 st.title("Website Plugin Checker")
 
 col1, col2 = st.columns(2)
