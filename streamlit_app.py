@@ -30,7 +30,9 @@ def find_keywords(url, keywords):
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
-            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', cleaned_content))
+            # Use word boundary for whole word matching
+            pattern = r'\b' + re.escape(keyword_lower) + r'\b'
+            count = len(re.findall(pattern, cleaned_content))
             if count > 0:
                 matches[keyword] = count
         return matches, len(html_content)
@@ -48,7 +50,7 @@ keywords_input = st.text_input("Enter keywords to search for (comma-separated):"
 
 if st.button("Search"):
     if url and keywords_input:
-        keywords = [k.strip() for k in keywords_input.replace(' ', '').split(',')]
+        keywords = [k.strip() for k in keywords_input.split(',')]
         
         results, page_size = find_keywords(url, keywords)
         
