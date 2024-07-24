@@ -1,11 +1,22 @@
 import streamlit as st
 import requests
-from bs4 import BeautifulSoup
 import re
 from urllib3.exceptions import InsecureRequestWarning
+from html import unescape
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+def clean_html(html):
+    # Remove script and style elements
+    html = re.sub(r'<(script|style).*?</\1>(?s)', '', html)
+    # Remove HTML tags
+    html = re.sub(r'<[^>]+>', ' ', html)
+    # Decode HTML entities
+    html = unescape(html)
+    # Remove extra whitespace
+    html = re.sub(r'\s+', ' ', html).strip()
+    return html
 
 def find_keywords(url, keywords):
     try:
@@ -13,22 +24,22 @@ def find_keywords(url, keywords):
         response = requests.get(url, headers=headers, timeout=10, verify=False)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        html_content = soup.get_text().lower()
+        html_content = response.text
+        cleaned_content = clean_html(html_content).lower()
         
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
-            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', cleaned_content))
             if count > 0:
                 matches[keyword] = count
-        return matches
+        return matches, len(html_content)
     except requests.RequestException as e:
         st.error(f"Error fetching the webpage: {e}")
-        return None
+        return None, 0
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
-        return None
+        return None, 0
 
 st.title("Keyword Finder")
 
@@ -39,7 +50,7 @@ if st.button("Search"):
     if url and keywords_input:
         keywords = [k.strip() for k in keywords_input.replace(' ', '').split(',')]
         
-        results = find_keywords(url, keywords)
+        results, page_size = find_keywords(url, keywords)
         
         if results is not None:
             if results:
@@ -60,7 +71,7 @@ if st.button("Search"):
             response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
             st.write(f"Status Code: {response.status_code}")
             st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
-            st.write(f"Page Size: {len(response.text)} characters")
+            st.write(f"Page Size: {page_size} characters")
         except Exception as e:
             st.error(f"Failed to get additional information: {e}")
     else:
