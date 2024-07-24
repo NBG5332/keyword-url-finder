@@ -1,91 +1,77 @@
 import streamlit as st
 import requests
 import re
+from bs4 import BeautifulSoup
 from urllib3.exceptions import InsecureRequestWarning
-from html import unescape
-import traceback
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-def clean_html(html):
-    try:
-        # Remove script and style elements
-        html = re.sub(r'(?s)<(script|style).*?</\1>', '', html)
-        # Remove HTML tags
-        html = re.sub(r'<[^>]+>', ' ', html)
-        # Decode HTML entities
-        html = unescape(html)
-        # Remove extra whitespace
-        html = re.sub(r'\s+', ' ', html).strip()
-        return html
-    except Exception as e:
-        st.error(f"Error in clean_html: {e}")
-        st.error(traceback.format_exc())
-        return ""
-
 def find_keywords(url, keywords):
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        # Send a GET request to the URL
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
         response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()
+        response.raise_for_status()  # Raise an exception for bad status codes
         
-        html_content = response.text
-        cleaned_content = clean_html(html_content).lower()
+        # Get the full HTML content
+        html_content = response.text.lower()
         
+        # Find matches for each keyword
         matches = {}
         for keyword in keywords:
-            try:
-                keyword_lower = keyword.lower()
-                pattern = r'\b' + re.escape(keyword_lower) + r'\b'
-                count = len(re.findall(pattern, cleaned_content))
-                if count > 0:
-                    matches[keyword] = count
-            except Exception as e:
-                st.error(f"Error processing keyword '{keyword}': {e}")
-                st.error(traceback.format_exc())
-        return matches, len(html_content)
+            keyword_lower = keyword.lower()
+            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            if count > 0:
+                matches[keyword] = count
+        
+        return matches
     except requests.RequestException as e:
         st.error(f"Error fetching the webpage: {e}")
-        return None, 0
+        return None
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
-        st.error(traceback.format_exc())
-        return None, 0
+        return None
 
-st.title("Keyword Finder")
-
-url = st.text_input("Enter the URL to inspect:")
-keywords_input = st.text_input("Enter keywords to search for (comma-separated):")
-
-if st.button("Search"):
-    if url and keywords_input:
-        keywords = [k.strip() for k in keywords_input.split(',') if k.strip()]
-        
-        results, page_size = find_keywords(url, keywords)
-        
-        if results is not None:
-            if results:
-                st.subheader("Keywords found:")
-                for keyword, count in results.items():
-                    st.write(f"'{keyword}': {count} occurrences")
-                
-                not_found = set(keywords) - set(results.keys())
-                if not_found:
-                    st.subheader("Keywords not found:")
-                    for keyword in not_found:
-                        st.write(f"'{keyword}'")
+def main():
+    st.title("Keyword Finder in Web Pages")
+    st.write("Enter a URL and a list of keywords to find out how often each keyword appears on the webpage.")
+    
+    url = st.text_input("Enter the URL to inspect:", "")
+    keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
+    
+    if st.button("Search Keywords"):
+        if url and keywords_input:
+            keywords = [k.strip() for k in keywords_input.split(',')]
+            results = find_keywords(url, keywords)
+            
+            if results is not None:
+                if results:
+                    st.success("Keywords found:")
+                    for keyword, count in results.items():
+                        st.write(f"'{keyword}': {count} occurrences")
+                    
+                    not_found = set(keywords) - set(results.keys())
+                    if not_found:
+                        st.info("Keywords not found:")
+                        for keyword in not_found:
+                            st.write(f"'{keyword}'")
+                else:
+                    st.warning("No keywords were found on the page.")
             else:
-                st.info("No keywords were found on the page.")
-        
-        st.subheader("Additional Information:")
-        try:
-            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
-            st.write(f"Status Code: {response.status_code}")
-            st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
-            st.write(f"Page Size: {page_size} characters")
-        except Exception as e:
-            st.error(f"Failed to get additional information: {e}")
-            st.error(traceback.format_exc())
-    else:
-        st.warning("Please enter both URL and keywords.")
+                st.error("Unable to process the page due to an error.")
+            
+            # Additional debugging information
+            st.subheader("Additional Information:")
+            try:
+                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
+                st.write(f"Status Code: {response.status_code}")
+                st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
+                st.write(f"Page Size: {len(response.text)} characters")
+            except Exception as e:
+                st.error(f"Failed to get additional information: {e}")
+
+if __name__ == "__main__":
+    main()
