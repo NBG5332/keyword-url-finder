@@ -1,47 +1,30 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
 import re
+from requests_html import HTMLSession
 from urllib3.exceptions import InsecureRequestWarning
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import urllib3
 
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+urllib3.disable_warnings(category=InsecureRequestWarning)
 
 def find_keywords(url, keywords):
     try:
-        # Set up Selenium
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        driver = webdriver.Chrome(options=chrome_options)
+        session = HTMLSession()
+        r = session.get(url)
+        r.html.render(timeout=20)  # This line executes JavaScript
+        html_content = r.html.html.lower()
         
-        # Load the page
-        driver.get(url)
-        
-        # Wait for the page to load (adjust the timeout and condition as needed)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        
-        # Get the rendered HTML content
-        html_content = driver.page_source.lower()
-        
-        # Find matches for each keyword
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
             count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
             if count > 0:
                 matches[keyword] = count
-        
-        driver.quit()
         return matches
     except Exception as e:
         st.error(f"An error occurred: {e}")
         return None
 
-# ... (rest of the Streamlit code remains the same)
+
 st.title("Website Plugin Checker")
 
 col1, col2 = st.columns(2)
