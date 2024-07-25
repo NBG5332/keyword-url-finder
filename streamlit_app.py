@@ -1,24 +1,23 @@
 import streamlit as st
-import requests
 import re
-from bs4 import BeautifulSoup
-from urllib3.exceptions import InsecureRequestWarning
+from playwright.sync_api import sync_playwright
 
-# Suppress only the single warning from urllib3 needed.
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
-def find_keywords(url, keywords):
+def find_keywords_playwright(url, keywords):
     try:
-        # Send a GET request to the URL
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        
-        # Get the full HTML content
-        html_content = response.text.lower()
-        
+        # Start Playwright and open a new browser context
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            # Visit the URL
+            page.goto(url)
+
+            # Get the full HTML content
+            html_content = page.content().lower()
+
+            # Close the browser
+            browser.close()
+
         # Find matches for each keyword
         matches = {}
         for keyword in keywords:
@@ -29,9 +28,7 @@ def find_keywords(url, keywords):
                 matches[keyword] = found
         
         return matches
-    except requests.RequestException as e:
-        st.error(f"Error fetching the webpage: {e}")
-        return None
+
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
         return None
@@ -46,7 +43,7 @@ def main():
     if st.button("Search Keywords"):
         if url and keywords_input:
             keywords = [k.strip() for k in keywords_input.split(',')]
-            results = find_keywords(url, keywords)
+            results = find_keywords_playwright(url, keywords)
             
             if results is not None:
                 if results:
