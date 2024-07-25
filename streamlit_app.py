@@ -43,7 +43,7 @@ def main():
     st.title("Keyword Finder in Multiple Web Pages")
     st.write("Enter URLs and keywords to find out how often each keyword appears on each webpage.")
     
-    urls_have_https = st.checkbox("URLs already include 'https://'", value=True)
+    urls_have_https = st.checkbox("URLs already include 'https:// ? If Yes then put a tick mark. Else No tick mark'", value=True)
     
     urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
