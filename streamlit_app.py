@@ -1,24 +1,23 @@
+import os
 import streamlit as st
 import re
 from playwright.sync_api import sync_playwright
 
+def setup_playwright():
+    # Run the setup script to install Playwright browsers
+    if not os.path.exists('/home/appuser/.cache/ms-playwright'):
+        os.system("chmod +x setup.sh && ./setup.sh")
+
 def find_keywords_playwright(url, keywords):
+    setup_playwright()
     try:
-        # Start Playwright and open a new browser context
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-
-            # Visit the URL
-            page.goto(url)
-
-            # Get the full HTML content
+            page.goto(url, wait_until="networkidle")  # Ensures the page is fully loaded
             html_content = page.content().lower()
-
-            # Close the browser
             browser.close()
 
-        # Find matches for each keyword
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
@@ -61,10 +60,12 @@ def main():
                     st.warning("No keywords were found on the page.")
             else:
                 st.error("Unable to process the page due to an error.")
-            
+
             # Additional debugging information
             st.subheader("Additional Information:")
             try:
+                # Import requests if not already imported
+                import requests
                 response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
                 st.write(f"Status Code: {response.status_code}")
                 st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
