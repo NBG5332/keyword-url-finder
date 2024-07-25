@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
-
+import selenium as se
 def find_keywords(url, keywords):
     try:
         # Send a GET request to the URL
