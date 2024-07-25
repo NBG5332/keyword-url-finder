@@ -1,32 +1,36 @@
-import os
 import streamlit as st
+import requests
 import re
-from playwright.sync_api import sync_playwright
+from bs4 import BeautifulSoup
+from urllib3.exceptions import InsecureRequestWarning
 
-def setup_playwright():
-    # Run the setup script to install Playwright browsers
-    if not os.path.exists('/home/appuser/.cache/ms-playwright'):
-        os.system("chmod +x setup.sh && ./setup.sh")
+# Suppress only the single warning from urllib3 needed.
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-def find_keywords_playwright(url, keywords):
-    setup_playwright()
+def find_keywords(url, keywords):
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle")  # Ensures the page is fully loaded
-            html_content = page.content().lower()
-            browser.close()
-
+        # Send a GET request to the URL
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # Get the full HTML content
+        html_content = response.text.lower()
+        
+        # Find matches for each keyword
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
-            found = re.findall(r'(\S*' + re.escape(keyword_lower) + r'\S*)', html_content)
-            if found:
-                matches[keyword] = found
+            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            if count > 0:
+                matches[keyword] = count
         
         return matches
-
+    except requests.RequestException as e:
+        st.error(f"Error fetching the webpage: {e}")
+        return None
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
         return None
@@ -40,15 +44,14 @@ def main():
     
     if st.button("Search Keywords"):
         if url and keywords_input:
-            keywords = [k.strip() for k in keywords_input.split(',')]
-            results = find_keywords_playwright(url, keywords)
+            keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
+            results = find_keywords(url, keywords)
             
             if results is not None:
                 if results:
                     st.success("Keywords found:")
-                    for keyword, matches in results.items():
-                        st.write(f"'{keyword}': {len(matches)} occurrences")
-                        st.write(f"Matches: {', '.join(matches)}")
+                    for keyword, count in results.items():
+                        st.write(f"'{keyword}': {count} occurrences")
                     
                     not_found = set(keywords) - set(results.keys())
                     if not_found:
@@ -59,11 +62,10 @@ def main():
                     st.warning("No keywords were found on the page.")
             else:
                 st.error("Unable to process the page due to an error.")
-
+            
             # Additional debugging information
             st.subheader("Additional Information:")
             try:
-                import requests  # Ensure requests is imported
                 response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
                 st.write(f"Status Code: {response.status_code}")
                 st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
