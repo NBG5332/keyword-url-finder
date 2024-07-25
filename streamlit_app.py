@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import re
+import csv
+from io import StringIO
 from urllib3.exceptions import InsecureRequestWarning
 
 # Suppress only the single warning from urllib3 needed.
@@ -43,6 +45,8 @@ def main():
             urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
             keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
             
+            all_results = []
+            
             for url in urls:
                 st.subheader(url)
                 url_results = find_keywords(url, keywords)
@@ -53,9 +57,25 @@ def main():
                                 st.write(f"{keyword}: {count} time")
                             else:
                                 st.write(f"{keyword}: {count} times")
+                            all_results.append([url, keyword, count])
                     else:
                         st.write("No keywords found on this page.")
                 st.write("---")  # Add a separator between URLs
+            
+            if all_results:
+                # Create CSV string
+                csv_string = StringIO()
+                csv_writer = csv.writer(csv_string)
+                csv_writer.writerow(['URL', 'Keyword', 'Count'])
+                csv_writer.writerows(all_results)
+                
+                # Offer download button
+                st.download_button(
+                    label="Download results as CSV",
+                    data=csv_string.getvalue(),
+                    file_name="keyword_results.csv",
+                    mime="text/csv"
+                )
 
 if __name__ == "__main__":
     main()
