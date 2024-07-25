@@ -4,9 +4,15 @@ import re
 import csv
 from io import StringIO
 from urllib3.exceptions import InsecureRequestWarning
+from urllib.parse import urlparse
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+def add_https(url):
+    if not urlparse(url).scheme:
+        return 'https://' + url
+    return url
 
 def find_keywords(url, keywords):
     try:
@@ -37,12 +43,16 @@ def main():
     st.title("Keyword Finder in Multiple Web Pages")
     st.write("Enter URLs and keywords to find out how often each keyword appears on each webpage.")
     
-    urls_input = st.text_area("Enter the URLs to inspect (one per line, Press SHIFT+ENTER to go to new line):", "")
+    urls_have_https = st.checkbox("URLs already include 'https://'", value=True)
+    
+    urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
     
     if st.button("Search Keywords"):
         if urls_input and keywords_input:
             urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
+            if not urls_have_https:
+                urls = [add_https(url) for url in urls]
             keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
             
             all_results = []
