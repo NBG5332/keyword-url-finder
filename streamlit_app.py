@@ -22,8 +22,7 @@ def find_keywords_playwright(url, keywords):
         for keyword in keywords:
             keyword_lower = keyword.lower()
             found = re.findall(r'(\S*' + re.escape(keyword_lower) + r'\S*)', html_content)
-            count = len(found)
-            if count > 0:
+            if found:
                 matches[keyword] = found
         
         return matches
@@ -64,8 +63,7 @@ def main():
             # Additional debugging information
             st.subheader("Additional Information:")
             try:
-                # Import requests if not already imported
-                import requests
+                import requests  # Ensure requests is imported
                 response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
                 st.write(f"Status Code: {response.status_code}")
                 st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
