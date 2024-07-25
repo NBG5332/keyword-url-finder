@@ -37,7 +37,7 @@ def main():
     st.title("Keyword Finder in Multiple Web Pages")
     st.write("Enter URLs and keywords to find out how often each keyword appears on each webpage.")
     
-    urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
+    urls_input = st.text_area("Enter the URLs to inspect (one per line, Press SHIFT+ENTER to go to new line):", "")
     keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
     
     if st.button("Search Keywords"):
