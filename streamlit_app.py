@@ -23,9 +23,10 @@ def find_keywords(url, keywords):
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
-            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            found = re.findall(r'(\S*' + re.escape(keyword_lower) + r'\S*)', html_content)
+            count = len(found)
             if count > 0:
-                matches[keyword] = count
+                matches[keyword] = found
         
         return matches
     except requests.RequestException as e:
@@ -50,8 +51,9 @@ def main():
             if results is not None:
                 if results:
                     st.success("Keywords found:")
-                    for keyword, count in results.items():
-                        st.write(f"'{keyword}': {count} occurrences")
+                    for keyword, matches in results.items():
+                        st.write(f"'{keyword}': {len(matches)} occurrences")
+                        st.write(f"Matches: {', '.join(matches)}")
                     
                     not_found = set(keywords) - set(results.keys())
                     if not_found:
