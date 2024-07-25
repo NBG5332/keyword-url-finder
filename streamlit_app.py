@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
 import re
-import pandas as pd
-from io import BytesIO
 from urllib3.exceptions import InsecureRequestWarning
 
 # Suppress only the single warning from urllib3 needed.
@@ -22,7 +20,8 @@ def find_keywords(url, keywords):
         for keyword in keywords:
             keyword_lower = keyword.lower()
             count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
-            matches[keyword] = count
+            if count > 0:
+                matches[keyword] = count
         
         return matches
     except requests.RequestException as e:
@@ -41,35 +40,22 @@ def main():
     
     if st.button("Search Keywords"):
         if urls_input and keywords_input:
-            urls = [url.strip() for url in urls_input.split(',') if url.strip()]
+            urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
             keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
             
-            results = []
-            
             for url in urls:
+                st.subheader(url)
                 url_results = find_keywords(url, keywords)
                 if url_results is not None:
-                    results.append({'URL': url, **url_results})
-            
-            if results:
-                df = pd.DataFrame(results)
-                st.success("Keywords found:")
-                st.dataframe(df)
-                
-                # Create Excel file
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Keyword Results')
-                
-                # Offer download link
-                st.download_button(
-                    label="Download results as Excel",
-                    data=output.getvalue(),
-                    file_name="keyword_results.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                st.warning("No results found or all URL requests failed.")
+                    if url_results:
+                        for keyword, count in url_results.items():
+                            if count == 1:
+                                st.write(f"{keyword}: {count} time")
+                            else:
+                                st.write(f"{keyword}: {count} times")
+                    else:
+                        st.write("No keywords found on this page.")
+                st.write("---")  # Add a separator between URLs
 
 if __name__ == "__main__":
     main()
