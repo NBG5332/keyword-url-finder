@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
 import re
-from bs4 import BeautifulSoup
+import pandas as pd
+from io import BytesIO
 from urllib3.exceptions import InsecureRequestWarning
 
 # Suppress only the single warning from urllib3 needed.
@@ -9,69 +10,66 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 def find_keywords(url, keywords):
     try:
-        # Send a GET request to the URL
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        response.raise_for_status()
         
-        # Get the full HTML content
         html_content = response.text.lower()
         
-        # Find matches for each keyword
         matches = {}
         for keyword in keywords:
             keyword_lower = keyword.lower()
             count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
-            if count > 0:
-                matches[keyword] = count
+            matches[keyword] = count
         
         return matches
     except requests.RequestException as e:
-        st.error(f"Error fetching the webpage: {e}")
+        st.error(f"Error fetching the webpage {url}: {e}")
         return None
     except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
+        st.error(f"An unexpected error occurred for {url}: {e}")
         return None
 
 def main():
-    st.title("Keyword Finder in Web Pages")
-    st.write("Enter a URL and a list of keywords to find out how often each keyword appears on the webpage.")
+    st.title("Keyword Finder in Multiple Web Pages")
+    st.write("Enter URLs and keywords to find out how often each keyword appears on each webpage.")
     
-    url = st.text_input("Enter the URL to inspect:", "")
+    urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
     
     if st.button("Search Keywords"):
-        if url and keywords_input:
+        if urls_input and keywords_input:
+            urls = [url.strip() for url in urls_input.split(',') if url.strip()]
             keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
-            results = find_keywords(url, keywords)
             
-            if results is not None:
-                if results:
-                    st.success("Keywords found:")
-                    for keyword, count in results.items():
-                        st.write(f"'{keyword}': {count} occurrences")
-                    
-                    not_found = set(keywords) - set(results.keys())
-                    if not_found:
-                        st.info("Keywords not found:")
-                        for keyword in not_found:
-                            st.write(f"'{keyword}'")
-                else:
-                    st.warning("No keywords were found on the page.")
+            results = []
+            
+            for url in urls:
+                url_results = find_keywords(url, keywords)
+                if url_results is not None:
+                    results.append({'URL': url, **url_results})
+            
+            if results:
+                df = pd.DataFrame(results)
+                st.success("Keywords found:")
+                st.dataframe(df)
+                
+                # Create Excel file
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Keyword Results')
+                
+                # Offer download link
+                st.download_button(
+                    label="Download results as Excel",
+                    data=output.getvalue(),
+                    file_name="keyword_results.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             else:
-                st.error("Unable to process the page due to an error.")
-            
-            # Additional debugging information
-            st.subheader("Additional Information:")
-            try:
-                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
-                st.write(f"Status Code: {response.status_code}")
-                st.write(f"Content Type: {response.headers.get('Content-Type', 'Not specified')}")
-                st.write(f"Page Size: {len(response.text)} characters")
-            except Exception as e:
-                st.error(f"Failed to get additional information: {e}")
+                st.warning("No results found or all URL requests failed.")
 
 if __name__ == "__main__":
     main()
