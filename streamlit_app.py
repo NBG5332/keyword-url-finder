@@ -1,21 +1,31 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
 import re
-import selenium as se
-def find_keywords(url, keywords):
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+
+def find_keywords_selenium(url, keywords):
+    # Set up Chrome options
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+    # Specify the path to your ChromeDriver
+    service = Service(executable_path='path/to/chromedriver')  # Update with your path
+
     try:
-        # Send a GET request to the URL
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        
-        # Parse the HTML content with BeautifulSoup
-        soup = BeautifulSoup(response.text, 'html.parser')
-        html_content = soup.get_text().lower()
-        
+        # Initialize the driver
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver.get(url)
+
+        # Wait for the page to load (can be improved with WebDriverWait if necessary)
+        driver.implicitly_wait(10)
+
+        # Get the page source
+        html_content = driver.page_source.lower()
+
         # Find matches for each keyword
         matches = {}
         for keyword in keywords:
@@ -24,26 +34,23 @@ def find_keywords(url, keywords):
             if count > 0:
                 matches[keyword] = count
 
+        driver.quit()
         return matches
-
-    except requests.RequestException as e:
-        st.error(f"Error fetching the webpage: {e}")
-        return None
     except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
+        st.error(f"An error occurred while fetching the webpage: {e}")
         return None
 
 def main():
     st.title("Keyword Finder in Web Pages")
     st.write("Enter a URL and a list of keywords to find out how often each keyword appears on the webpage.")
-    
-    url = st.text_input("Enter the URL to inspect:", "https://moegreens.treez.io/onlinemenu/category/flower/item/c59a8420-8771-47da-9de9-493aa302a82b?customerType=ALL")
-    keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "google-tag-manager")
-    
+
+    url = st.text_input("Enter the URL to inspect:", "")
+    keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
+
     if st.button("Search Keywords"):
         if url and keywords_input:
             keywords = [k.strip() for k in keywords_input.split(',')]
-            results = find_keywords(url, keywords)
+            results = find_keywords_selenium(url, keywords)
 
             if results is not None:
                 if results:
