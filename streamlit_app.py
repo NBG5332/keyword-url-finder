@@ -9,6 +9,14 @@ from urllib.parse import urlparse
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
+DEFAULT_KEYWORDS = [
+    "leafly", "greenbits", "flowhub", "indica online", "treez", "biotrack", 
+    "mj freeway", "meadow", "blaze", "leaflogic", "growflow", "greenline", 
+    "tech pos", "posabit", "bio track", "all leaves", "lightspeed", "bindo", 
+    "vende", "dauntless", "alpineiq", "hoodie analytics", "surfside", 
+    "google analytics", "mixpanel", "terpli", "dutchie"
+]
+
 def add_https(url):
     if not urlparse(url).scheme:
         return 'https://' + url
@@ -41,19 +49,29 @@ def find_keywords(url, keywords):
 
 def main():
     st.title("Keyword Finder in Multiple Web Pages")
-    st.write("Enter URLs and keywords to find out how often each keyword appears on each webpage.")
-    
-    urls_have_https = st.checkbox("URLs already include 'https:// ? If Yes then put a tick mark. Else No tick mark'", value=True)
+    st.write("Enter URLs and select keywords to find out how often each keyword appears on each webpage.")
     
     urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
-    keywords_input = st.text_input("Enter keywords to search for (comma-separated):", "")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.subheader("Select Keywords")
+        all_selected = st.checkbox("Select All Keywords")
+        selected_keywords = st.multiselect(
+            "Choose keywords:",
+            DEFAULT_KEYWORDS,
+            default=DEFAULT_KEYWORDS if all_selected else []
+        )
+    
+    with col2:
+        st.subheader("Add Custom Keywords")
+        custom_keywords = st.text_area("Enter custom keywords (one per line):", "")
     
     if st.button("Search Keywords"):
-        if urls_input and keywords_input:
-            urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
-            if not urls_have_https:
-                urls = [add_https(url) for url in urls]
-            keywords = [k.strip() for k in keywords_input.replace(' ','').split(',')]
+        if urls_input and (selected_keywords or custom_keywords):
+            urls = [add_https(url.strip()) for url in urls_input.split('\n') if url.strip()]
+            keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
             
             all_results = []
             
@@ -63,10 +81,7 @@ def main():
                 if url_results is not None:
                     if url_results:
                         for keyword, count in url_results.items():
-                            if count == 1:
-                                st.write(f"{keyword}: {count} time")
-                            else:
-                                st.write(f"{keyword}: {count} times")
+                            st.write(f"{keyword}: {count} time{'s' if count > 1 else ''}")
                             all_results.append([url, keyword, count])
                     else:
                         st.write("No keywords found on this page.")
