@@ -5,6 +5,7 @@ import csv
 from io import StringIO
 from urllib3.exceptions import InsecureRequestWarning
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -17,12 +18,33 @@ DEFAULT_KEYWORDS = [
     "google analytics", "mixpanel", "terpli", "dutchie"
 ]
 
+POS_SYSTEMS = {
+    "Treez": ["treez.io", "treezsoftware"],
+    "Flowhub": ["flowhub.com", "flowhub.co"],
+    "Greenbits": ["greenbits.com"],
+    "BioTrack": ["biotrack.com"],
+    "MJ Freeway": ["mjfreeway.com"],
+    "Blaze": ["blaze.me"],
+    "LeafLogix": ["leaflogix.com"],
+    "GrowFlow": ["growflow.com"],
+    "IndicaOnline": ["indicaonline.com"],
+}
+
+PAYMENT_PROCESSORS = {
+    "Square": ["squareup.com"],
+    "Stripe": ["stripe.com"],
+    "PayPal": ["paypal.com"],
+    "Authorize.Net": ["authorize.net"],
+    "Merrco": ["merrco.com"],
+    "CanPay": ["canpay.com"],
+}
+
 def add_https(url):
     if not urlparse(url).scheme:
         return 'https://' + url
     return url
 
-def find_keywords(url, keywords):
+def find_keywords_and_systems(url, keywords):
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -31,6 +53,7 @@ def find_keywords(url, keywords):
         response.raise_for_status()
         
         html_content = response.text.lower()
+        soup = BeautifulSoup(html_content, 'html.parser')
         
         matches = {}
         for keyword in keywords:
@@ -39,17 +62,31 @@ def find_keywords(url, keywords):
             if count > 0:
                 matches[keyword] = count
         
-        return matches
+        # Check for POS systems
+        pos_system = "Unknown"
+        for system, indicators in POS_SYSTEMS.items():
+            if any(indicator.lower() in html_content for indicator in indicators):
+                pos_system = system
+                break
+        
+        # Check for payment processors
+        payment_processor = "Unknown"
+        for processor, indicators in PAYMENT_PROCESSORS.items():
+            if any(indicator.lower() in html_content for indicator in indicators):
+                payment_processor = processor
+                break
+        
+        return matches, pos_system, payment_processor
     except requests.RequestException as e:
         st.error(f"Error fetching the webpage {url}: {e}")
-        return None
+        return None, "Error", "Error"
     except Exception as e:
         st.error(f"An unexpected error occurred for {url}: {e}")
-        return None
+        return None, "Error", "Error"
 
 def main():
-    st.title("Keyword Finder in Multiple Web Pages")
-    st.write("Enter URLs and select keywords to find out how often each keyword appears on each webpage.")
+    st.title("Website Analyzer")
+    st.write("Enter URLs to analyze for keywords, POS systems, and payment processors.")
     
     urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     
@@ -68,7 +105,7 @@ def main():
         st.subheader("Add Custom Keywords")
         custom_keywords = st.text_area("Enter custom keywords (one per line):", "")
     
-    if st.button("Search Keywords"):
+    if st.button("Analyze Websites"):
         if urls_input and (selected_keywords or custom_keywords):
             urls = [add_https(url.strip()) for url in urls_input.split('\n') if url.strip()]
             keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
@@ -77,28 +114,32 @@ def main():
             
             for url in urls:
                 st.subheader(url)
-                url_results = find_keywords(url, keywords)
-                if url_results is not None:
-                    if url_results:
-                        for keyword, count in url_results.items():
-                            st.write(f"{keyword}: {count} time{'s' if count > 1 else ''}")
-                            all_results.append([url, keyword, count])
+                keyword_results, pos_system, payment_processor = find_keywords_and_systems(url, keywords)
+                if keyword_results is not None:
+                    st.write(f"Detected POS System: {pos_system}")
+                    st.write(f"Detected Payment Processor: {payment_processor}")
+                    if keyword_results:
+                        st.write("Keywords found:")
+                        for keyword, count in keyword_results.items():
+                            st.write(f"- {keyword}: {count} time{'s' if count > 1 else ''}")
+                            all_results.append([url, keyword, count, pos_system, payment_processor])
                     else:
                         st.write("No keywords found on this page.")
+                        all_results.append([url, "No keywords found", 0, pos_system, payment_processor])
                 st.write("---")  # Add a separator between URLs
             
             if all_results:
                 # Create CSV string
                 csv_string = StringIO()
                 csv_writer = csv.writer(csv_string)
-                csv_writer.writerow(['URL', 'Keyword', 'Count'])
+                csv_writer.writerow(['URL', 'Keyword', 'Count', 'POS System', 'Payment Processor'])
                 csv_writer.writerows(all_results)
                 
                 # Offer download button
                 st.download_button(
                     label="Download results as CSV",
                     data=csv_string.getvalue(),
-                    file_name="keyword_results.csv",
+                    file_name="website_analysis_results.csv",
                     mime="text/csv"
                 )
 
