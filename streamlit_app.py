@@ -10,14 +10,18 @@ from bs4 import BeautifulSoup
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-DEFAULT_KEYWORDS = [
-    "leafly", "greenbits", "flowhub", "indica online", "treez", "biotrack", 
-    "mj freeway", "meadow", "blaze", "leaflogic", "growflow", "greenline", 
-    "tech pos", "posabit", "bio track", "all leaves", "lightspeed", "bindo", 
-    "vende", "dauntless", "alpineiq", "hoodie analytics", "surfside", 
-    "google analytics", "mixpanel", "terpli", "dutchie", "weedmaps", "iheartjane", "weave", "adilas",
-    "cova", "headset", "clover","leaflogix"
-]
+KEYWORD_CATEGORIES = {
+    "POS": [
+        "leaflogix", "cova", "flowhub", "treez", "greenline", "blaze", "jane", "iheartjane",
+        "greenbits", "indicaonline", "growflow", "helix biotrack", "meadow", "proteus420",
+        "posabit", "techpos", "mj platform", "portal42", "seedsuite", "weave", "global till",
+        "sweed", "ommpos", "anthea", "cannapoint", "krimzen", "thsuite", "hyve tech", "bloom",
+        "cannasync", "island erp", "bud bytes", "klicktrack", "dataowl", "enlighten", "ranger pos",
+        "cultivera", "alleaves", "dutchie"
+    ],
+    "Online Marketplace": ["weedmaps", "surfside", "leafly"],
+    "Analytics": ["alpineiq", "terpli"]
+}
 
 def add_https(url):
     if not urlparse(url).scheme:
@@ -56,30 +60,25 @@ def find_keywords(url, keywords):
         st.error(f"An unexpected error occurred for {url}: {e}")
         return None, None
 
+def categorize_results(results):
+    categorized = {category: {} for category in KEYWORD_CATEGORIES}
+    for keyword, count in results.items():
+        for category, keywords in KEYWORD_CATEGORIES.items():
+            if keyword.lower() in keywords:
+                categorized[category][keyword] = count
+                break
+    return categorized
+
 def main():
     st.title("Keyword Finder in Multiple Web Pages")
-    st.write("Enter URLs and select keywords to find out how often each keyword appears on each webpage and its shop page.")
+    st.write("Enter URLs to find keywords related to POS, Online Marketplace, and Analytics.")
     
     urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        st.subheader("Select Keywords")
-        all_selected = st.checkbox("Select All Keywords")
-        selected_keywords = st.multiselect(
-            "Choose keywords (all selected by default):",
-            DEFAULT_KEYWORDS,
-            default=DEFAULT_KEYWORDS
-        )    
-    with col2:
-        st.subheader("Add Custom Keywords")
-        custom_keywords = st.text_area("Enter custom keywords (one per line):", "")
-    
     if st.button("Search Keywords"):
-        if urls_input and (selected_keywords or custom_keywords):
+        if urls_input:
             urls = [add_https(url.strip()) for url in urls_input.split('\n') if url.strip()]
-            keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
+            keywords = [keyword for category in KEYWORD_CATEGORIES.values() for keyword in category]
             
             all_results = []
             
@@ -87,13 +86,17 @@ def main():
                 st.subheader(url)
                 url_results, html_content = find_keywords(url, keywords)
                 if url_results is not None:
-                    if url_results:
-                        st.write("Main page results:")
-                        for keyword, count in url_results.items():
-                            st.write(f"{keyword}: {count} time{'s' if count > 1 else ''}")
-                            all_results.append([url, "Main", keyword, count])
-                    else:
-                        st.write("No keywords found on the main page.")
+                    categorized_results = categorize_results(url_results)
+                    st.write("Main page results:")
+                    for category, results in categorized_results.items():
+                        if results:
+                            st.write(f"{category}:")
+                            for keyword, count in results.items():
+                                st.write(f"  {keyword}: {count} time{'s' if count > 1 else ''}")
+                                all_results.append([url, "Main", category, keyword, count])
+                    
+                    if not any(categorized_results.values()):
+                        st.write("No relevant keywords found on the main page.")
                     
                     # Find and process shop link
                     shop_link = find_shop_link(html_content, url)
@@ -101,12 +104,16 @@ def main():
                         st.write(f"\nShop page: {shop_link}")
                         shop_results, _ = find_keywords(shop_link, keywords)
                         if shop_results:
+                            categorized_shop_results = categorize_results(shop_results)
                             st.write("Shop page results:")
-                            for keyword, count in shop_results.items():
-                                st.write(f"{keyword}: {count} time{'s' if count > 1 else ''}")
-                                all_results.append([url, "Shop", keyword, count])
+                            for category, results in categorized_shop_results.items():
+                                if results:
+                                    st.write(f"{category}:")
+                                    for keyword, count in results.items():
+                                        st.write(f"  {keyword}: {count} time{'s' if count > 1 else ''}")
+                                        all_results.append([url, "Shop", category, keyword, count])
                         else:
-                            st.write("No keywords found on the shop page.")
+                            st.write("No relevant keywords found on the shop page.")
                     else:
                         st.write("No shop link found on the main page.")
                 st.write("---")  # Add a separator between URLs
@@ -115,7 +122,7 @@ def main():
                 # Create CSV string
                 csv_string = StringIO()
                 csv_writer = csv.writer(csv_string)
-                csv_writer.writerow(['Main URL', 'Page Type', 'Keyword', 'Count'])
+                csv_writer.writerow(['Main URL', 'Page Type', 'Category', 'Keyword', 'Count'])
                 csv_writer.writerows(all_results)
                 
                 # Offer download button
