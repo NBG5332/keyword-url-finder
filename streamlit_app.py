@@ -15,7 +15,8 @@ DEFAULT_KEYWORDS = [
     "mj freeway", "meadow", "blaze", "leaflogic", "growflow", "greenline", 
     "tech pos", "posabit", "bio track", "all leaves", "lightspeed", "bindo", 
     "vende", "dauntless", "alpineiq", "hoodie analytics", "surfside", 
-    "google analytics", "mixpanel", "terpli", "dutchie", "weedmaps", "iheartjane", "weave"
+    "google analytics", "mixpanel", "terpli", "dutchie", "weedmaps", "iheartjane", "weave", "adilas",
+    "cova", "headset", "clover"
 ]
 
 def add_https(url):
