@@ -16,7 +16,7 @@ DEFAULT_KEYWORDS = [
     "tech pos", "posabit", "bio track", "all leaves", "lightspeed", "bindo", 
     "vende", "dauntless", "alpineiq", "hoodie analytics", "surfside", 
     "google analytics", "mixpanel", "terpli", "dutchie", "weedmaps", "iheartjane", "weave", "adilas",
-    "cova", "headset", "clover"
+    "cova", "headset", "clover","leaflogix"
 ]
 
 def add_https(url):
