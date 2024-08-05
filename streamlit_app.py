@@ -23,6 +23,8 @@ KEYWORD_CATEGORIES = {
     "Analytics": ["alpineiq", "terpli"]
 }
 
+DEFAULT_KEYWORDS = [keyword for category in KEYWORD_CATEGORIES.values() for keyword in category]
+
 def add_https(url):
     if not urlparse(url).scheme:
         return 'https://' + url
@@ -75,10 +77,24 @@ def main():
     
     urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
     
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.subheader("Select Keywords")
+        all_selected = st.checkbox("Select All Keywords")
+        selected_keywords = st.multiselect(
+            "Choose keywords:",
+            DEFAULT_KEYWORDS,
+            default=DEFAULT_KEYWORDS if all_selected else []
+        )    
+    with col2:
+        st.subheader("Add Custom Keywords")
+        custom_keywords = st.text_area("Enter custom keywords (one per line):", "")
+    
     if st.button("Search Keywords"):
-        if urls_input:
+        if urls_input and (selected_keywords or custom_keywords):
             urls = [add_https(url.strip()) for url in urls_input.split('\n') if url.strip()]
-            keywords = [keyword for category in KEYWORD_CATEGORIES.values() for keyword in category]
+            keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
             
             all_results = []
             
