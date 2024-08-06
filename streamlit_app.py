@@ -48,11 +48,15 @@ def find_keywords(url, keywords):
         html_content = response.text.lower()
         
         matches = {}
+        # Check URL for keywords
+        url_lower = url.lower()
         for keyword in keywords:
             keyword_lower = keyword.lower()
-            count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
-            if count > 0:
-                matches[keyword] = count
+            url_count = url_lower.count(keyword_lower)
+            content_count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', html_content))
+            total_count = url_count + content_count
+            if total_count > 0:
+                matches[keyword] = total_count
         
         return matches, html_content
     except requests.RequestException as e:
@@ -61,7 +65,7 @@ def find_keywords(url, keywords):
     except Exception as e:
         st.error(f"An unexpected error occurred for {url}: {e}")
         return None, None
-
+        
 def categorize_results(results):
     categorized = {category: {} for category in KEYWORD_CATEGORIES}
     for keyword, count in results.items():
