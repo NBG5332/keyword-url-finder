@@ -12,7 +12,7 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 KEYWORD_CATEGORIES = {
     "POS": [
-        "leaflogix", "cova", "flowhub", "treez", "greenline", "blaze", "jane", "iheartjane",
+        "leaflogix", "cova", "flowhub", "treez", "greenline", "blaze","iheartjane",
         "greenbits", "indicaonline", "growflow", "helix biotrack", "meadow", "proteus420",
         "posabit", "techpos", "mj platform", "portal42", "seedsuite", "weave", "global till",
         "sweed", "ommpos", "anthea", "cannapoint", "krimzen", "thsuite", "hyve tech", "bloom",
