@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import re
 import csv
+import pandas as pd
 from io import StringIO
 from urllib3.exceptions import InsecureRequestWarning
 from urllib.parse import urlparse, urljoin
@@ -48,7 +49,6 @@ def find_keywords(url, keywords):
         html_content = response.text.lower()
         
         matches = {}
-        # Check URL for keywords
         url_lower = url.lower()
         for keyword in keywords:
             keyword_lower = keyword.lower()
@@ -65,21 +65,77 @@ def find_keywords(url, keywords):
     except Exception as e:
         st.error(f"An unexpected error occurred for {url}: {e}")
         return None, None
-        
+
+def format_results_string(results):
+    if not results:
+        return ""
+    formatted = []
+    for category, items in results.items():
+        if items:
+            category_results = [f"{keyword}: {count}" for keyword, count in items.items()]
+            formatted.append(f"{category}: {', '.join(category_results)}")
+    return "; ".join(formatted)
+
 def categorize_results(results):
     categorized = {category: {} for category in KEYWORD_CATEGORIES}
-    for keyword, count in results.items():
-        for category, keywords in KEYWORD_CATEGORIES.items():
-            if keyword.lower() in keywords:
-                categorized[category][keyword] = count
-                break
+    if results:
+        for keyword, count in results.items():
+            for category, keywords in KEYWORD_CATEGORIES.items():
+                if keyword.lower() in [k.lower() for k in keywords]:
+                    categorized[category][keyword] = count
+                    break
     return categorized
+
+def process_urls(urls, keywords):
+    results_data = []
+    
+    for url in urls:
+        if not url:
+            continue
+            
+        url = add_https(url.strip())
+        main_results, html_content = find_keywords(url, keywords)
+        main_results_formatted = format_results_string(categorize_results(main_results))
+        
+        shop_url = ""
+        shop_results_formatted = ""
+        
+        if html_content:
+            shop_url = find_shop_link(html_content, url) or ""
+            if shop_url:
+                shop_results, _ = find_keywords(shop_url, keywords)
+                shop_results_formatted = format_results_string(categorize_results(shop_results))
+        
+        results_data.append({
+            'URL': url,
+            'Main Page Results': main_results_formatted,
+            'Shop URL': shop_url,
+            'Shop Page Results': shop_results_formatted
+        })
+    
+    return pd.DataFrame(results_data)
 
 def main():
     st.title("Keyword Finder in Multiple Web Pages")
-    st.write("Enter URLs to find keywords related to POS, Online Marketplace, and Analytics.")
+    st.write("Enter URLs directly or upload an Excel file to find keywords.")
     
-    urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
+    input_method = st.radio("Choose input method:", ["Direct Input", "Excel File"])
+    
+    urls = []
+    if input_method == "Direct Input":
+        urls_input = st.text_area("Enter the URLs to inspect (one per line):", "")
+        if urls_input:
+            urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
+    else:
+        uploaded_file = st.file_uploader("Upload Excel file", type=['xlsx', 'xls'])
+        if uploaded_file:
+            try:
+                df = pd.read_excel(uploaded_file)
+                url_column = st.selectbox("Select URL column:", df.columns)
+                if url_column:
+                    urls = df[url_column].tolist()
+            except Exception as e:
+                st.error(f"Error reading Excel file: {e}")
     
     col1, col2 = st.columns([3, 1])
     
@@ -96,62 +152,27 @@ def main():
         custom_keywords = st.text_area("Enter custom keywords (one per line):", "")
     
     if st.button("Search Keywords"):
-        if urls_input and (selected_keywords or custom_keywords):
-            urls = [add_https(url.strip()) for url in urls_input.split('\n') if url.strip()]
+        if urls and (selected_keywords or custom_keywords):
             keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
             
-            all_results = []
+            results_df = process_urls(urls, keywords)
             
-            for url in urls:
-                st.subheader(url)
-                url_results, html_content = find_keywords(url, keywords)
-                if url_results is not None:
-                    categorized_results = categorize_results(url_results)
-                    st.write("Main page results:")
-                    for category, results in categorized_results.items():
-                        if results:
-                            st.write(f"{category}:")
-                            for keyword, count in results.items():
-                                st.write(f"  {keyword}: {count} time{'s' if count > 1 else ''}")
-                                all_results.append([url, "Main", category, keyword, count])
-                    
-                    if not any(categorized_results.values()):
-                        st.write("No relevant keywords found on the main page.")
-                    
-                    # Find and process shop link
-                    shop_link = find_shop_link(html_content, url)
-                    if shop_link:
-                        st.write(f"\nShop page: {shop_link}")
-                        shop_results, _ = find_keywords(shop_link, keywords)
-                        if shop_results:
-                            categorized_shop_results = categorize_results(shop_results)
-                            st.write("Shop page results:")
-                            for category, results in categorized_shop_results.items():
-                                if results:
-                                    st.write(f"{category}:")
-                                    for keyword, count in results.items():
-                                        st.write(f"  {keyword}: {count} time{'s' if count > 1 else ''}")
-                                        all_results.append([url, "Shop", category, keyword, count])
-                        else:
-                            st.write("No relevant keywords found on the shop page.")
-                    else:
-                        st.write("No shop link found on the main page.")
-                st.write("---")  # Add a separator between URLs
+            # Display results
+            st.subheader("Results")
+            st.dataframe(results_df)
             
-            if all_results:
-                # Create CSV string
-                csv_string = StringIO()
-                csv_writer = csv.writer(csv_string)
-                csv_writer.writerow(['Main URL', 'Page Type', 'Category', 'Keyword', 'Count'])
-                csv_writer.writerows(all_results)
-                
-                # Offer download button
-                st.download_button(
-                    label="Download results as CSV",
-                    data=csv_string.getvalue(),
-                    file_name="keyword_results.csv",
-                    mime="text/csv"
-                )
+            # Export to Excel
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                results_df.to_excel(writer, index=False, sheet_name='Results')
+            
+            st.download_button(
+                label="Download Results as Excel",
+                data=output.getvalue(),
+                file_name="keyword_results.xlsx",
+                mime="application/vnd.ms-excel"
+            )
 
 if __name__ == "__main__":
+    from io import BytesIO
     main()
