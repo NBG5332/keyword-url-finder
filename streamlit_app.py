@@ -65,15 +65,10 @@ def find_keywords(url, keywords):
         st.error(f"An unexpected error occurred for {url}: {e}")
         return None, None
 
-def format_results_string(results):
-    if not results:
+def format_results_string(results_dict):
+    if not results_dict:
         return ""
-    formatted = []
-    for category, items in results.items():
-        if items:
-            category_results = [f"{keyword}: {count}" for keyword, count in items.items()]
-            formatted.append(f"{category}: {', '.join(category_results)}")
-    return "; ".join(formatted)
+    return ", ".join(f"{keyword}: {count}" for keyword, count in results_dict.items())
 
 def categorize_results(results):
     categorized = {category: {} for category in KEYWORD_CATEGORIES}
@@ -94,23 +89,37 @@ def process_urls(urls, keywords):
             
         url = add_https(str(url).strip())
         main_results, html_content = find_keywords(url, keywords)
-        main_results_formatted = format_results_string(categorize_results(main_results))
         
-        shop_url = ""
-        shop_results_formatted = ""
-        
-        if html_content:
-            shop_url = find_shop_link(html_content, url) or ""
-            if shop_url:
-                shop_results, _ = find_keywords(shop_url, keywords)
-                shop_results_formatted = format_results_string(categorize_results(shop_results))
-        
-        results_data.append({
+        # Initialize result dictionary
+        result_row = {
             'URL': url,
-            'Main Page Results': main_results_formatted,
-            'Shop URL': shop_url,
-            'Shop Page Results': shop_results_formatted
-        })
+            'Main Page - POS': '',
+            'Main Page - Online Marketplace': '',
+            'Main Page - Analytics': '',
+            'Shop URL': '',
+            'Shop Page - POS': '',
+            'Shop Page - Online Marketplace': '',
+            'Shop Page - Analytics': ''
+        }
+        
+        # Process main page results
+        if main_results:
+            categorized_main = categorize_results(main_results)
+            for category in KEYWORD_CATEGORIES:
+                result_row[f'Main Page - {category}'] = format_results_string(categorized_main[category])
+        
+        # Process shop page
+        if html_content:
+            shop_url = find_shop_link(html_content, url)
+            if shop_url:
+                result_row['Shop URL'] = shop_url
+                shop_results, _ = find_keywords(shop_url, keywords)
+                if shop_results:
+                    categorized_shop = categorize_results(shop_results)
+                    for category in KEYWORD_CATEGORIES:
+                        result_row[f'Shop Page - {category}'] = format_results_string(categorized_shop[category])
+        
+        results_data.append(result_row)
     
     return pd.DataFrame(results_data)
 
@@ -165,6 +174,15 @@ def main():
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 results_df.to_excel(writer, index=False, sheet_name='Results')
+                
+                # Auto-adjust columns width
+                worksheet = writer.sheets['Results']
+                for idx, col in enumerate(results_df.columns):
+                    max_length = max(
+                        results_df[col].astype(str).apply(len).max(),
+                        len(col)
+                    ) + 2
+                    worksheet.column_dimensions[chr(65 + idx)].width = min(max_length, 50)  # limit to 50 characters
             
             st.download_button(
                 label="Download Results as Excel",
