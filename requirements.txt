@@ -1,5 +1,7 @@
+numpy
 streamlit
 pandas
-numpy
 requests
 beautifulsoup4
+openpyxl
+urllib3
