@@ -1,9 +1,8 @@
 import streamlit as st
 import requests
 import re
-import csv
 import pandas as pd
-from io import StringIO
+from io import BytesIO
 from urllib3.exceptions import InsecureRequestWarning
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
@@ -90,10 +89,10 @@ def process_urls(urls, keywords):
     results_data = []
     
     for url in urls:
-        if not url:
+        if not url or pd.isna(url):  # Handle NaN values in Excel
             continue
             
-        url = add_https(url.strip())
+        url = add_https(str(url).strip())
         main_results, html_content = find_keywords(url, keywords)
         main_results_formatted = format_results_string(categorize_results(main_results))
         
@@ -155,24 +154,24 @@ def main():
         if urls and (selected_keywords or custom_keywords):
             keywords = selected_keywords + [k.strip() for k in custom_keywords.split('\n') if k.strip()]
             
-            results_df = process_urls(urls, keywords)
+            with st.spinner('Processing URLs... This may take a few minutes.'):
+                results_df = process_urls(urls, keywords)
             
             # Display results
             st.subheader("Results")
             st.dataframe(results_df)
             
-            # Export to Excel
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Convert DataFrame to Excel
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 results_df.to_excel(writer, index=False, sheet_name='Results')
             
             st.download_button(
                 label="Download Results as Excel",
-                data=output.getvalue(),
+                data=buffer.getvalue(),
                 file_name="keyword_results.xlsx",
-                mime="application/vnd.ms-excel"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
 if __name__ == "__main__":
-    from io import BytesIO
     main()
