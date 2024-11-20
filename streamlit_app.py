@@ -17,7 +17,7 @@ KEYWORD_CATEGORIES = {
         "posabit", "techpos", "mj platform", "portal42", "seedsuite", "weave", "global till",
         "sweed", "ommpos", "anthea", "cannapoint", "krimzen", "thsuite", "hyve tech", "bloom",
         "cannasync", "island erp", "bud bytes", "klicktrack", "dataowl", "enlighten", "ranger pos",
-        "cultivera", "alleaves", "dutchie"
+        "cultivera", "alleaves", "dutchie","flourish"
     ],
     "Online Marketplace": ["weedmaps", "surfside", "leafly"],
     "Analytics": ["alpineiq", "terpli"]
